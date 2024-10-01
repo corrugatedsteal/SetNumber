@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Set a number</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+    <style>
+        @keyframes matrix {
+            0% {
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(100vh);
+                opacity: 0;
+            }
+        }
+
+        body {
+            font-family: 'Comic Sans MS', sans-serif;
+            margin: 0;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: black;
+            color: white;
+            position: relative;
+        }
+
+        h1 {
+            font-size: 2em;
+            margin-bottom: 20px;
+        }
+
+        #current-number {
+            font-size: 2.5em;
+            margin: 20px 0;
+        }
+
+        button, input {
+            font-size: 1.2em;
+            margin: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            border: none;
+            cursor: pointer;
+        }
+
+        #loading {
+            display: none;
+            font-size: 1.5em;
+            color: darkred;
+        }
+
+        /* Matrix-inspired background */
+        .matrix {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .matrix div {
+            position: absolute;
+            width: 1em;
+            height: 100vh;
+            background: transparent;
+            overflow: hidden;
+            animation: matrix 4s linear infinite;
+        }
+
+        .matrix div span {
+            display: block;
+            font-size: 1.5em;
+            color: lime;
+            text-shadow: 0 0 5px #33ff33;
+            line-height: 1.1em;
+            opacity: 0;
+            animation: fade 0.1s linear infinite;
+        }
+
+        @keyframes fade {
+            0% {
+                opacity: 0;
+            }
+            50% {
+                opacity: 1;
+            }
+            100% {
+                opacity: 0;
+            }
+        }
+
+        .matrix div span:nth-child(even) {
+            animation-delay: 0.2s;
+        }
+
+        .matrix div span:nth-child(odd) {
+            animation-delay: 0.4s;
+        }
+
+        /* Center content styling */
+        .content {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="matrix" id="matrix"></div>
+
+    <div class="content">
+        <h1>Set a number</h1>
+        
+        <button id="connectButton">Connect MetaMask</button>
+        
+        <div id="current-number-container">
+            <span>Current number: </span>
+            <span id="current-number">-</span>
+        </div>
+        
+        <input type="number" id="numberInput" placeholder="Enter a number">
+        <button id="setNumberButton">Set Number</button>
+
+        <div id="loading">Transaction in progress...</div>
+    </div>
+
+    <!-- Wind chime audio -->
+    <audio id="chimeSound" src="wind-chime.mp3" preload="auto"></audio>
+
+    <script>
+        let contract;
+        let signer;
+
+        const contractAddress = "0xcA7224095Ec370fD2d7952A6b64DB8a5a0B6147f";
+        const contractABI = [
+            {
+                "inputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "input",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "setNum",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "num",
+                "outputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "",
+                        "type": "uint256"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            }
+        ];
+
+        async function connectWallet() {
+            try {
+                const provider = new ethers.BrowserProvider(window.ethereum);
+                await provider.send("eth_requestAccounts", []);
+                signer = await provider.getSigner();
+                contract = new ethers.Contract(contractAddress, contractABI, signer);
+
+                document.getElementById("connectButton").textContent = "Wallet Connected";
+                document.getElementById("connectButton").disabled = true;
+                fetchCurrentNumber();
+            } catch (error) {
+                console.error("Connection error:", error);
+            }
+        }
+
+        async function fetchCurrentNumber() {
+            try {
+                const currentNum = await contract.num();
+                document.getElementById("current-number").textContent = currentNum;
+            } catch (error) {
+                console.error("Error fetching current number:", error);
+            }
+        }
+
+        async function setNumber() {
+            const input = document.getElementById("numberInput").value;
+            if (!input) {
+                alert("Please enter a valid number.");
+                return;
+            }
+
+            try {
+                // Play wind chime sound
+                const chimeSound = document.getElementById("chimeSound");
+                chimeSound.play();
+
+                document.getElementById("loading").style.display = "block";
+                const tx = await contract.setNum(input);
+                await tx.wait();
+                document.getElementById("loading").style.display = "none";
+                fetchCurrentNumber();
+            } catch (error) {
+                console.error("Transaction error:", error);
+                document.getElementById("loading").style.display = "none";
+            }
+        }
+
+        document.getElementById("connectButton").addEventListener("click", connectWallet);
+        document.getElementById("setNumberButton").addEventListener("click", setNumber);
+
+        // Matrix background effect
+        const matrix = document.getElementById("matrix");
+        const columns = Math.floor(window.innerWidth / 20);
+
+        for (let i = 0; i < columns; i++) {
+            const div = document.createElement("div");
+            div.style.left = i * 20 + "px";
+
+            for (let j = 0; j < 100; j++) {
+                const span = document.createElement("span");
+                span.textContent = Math.random() > 0.5 ? 1 : 0;
+                div.appendChild(span);
+            }
+
+            matrix.appendChild(div);
+
+            setTimeout(() => {
+                div.style.animationDuration = Math.random() * 5 + 3 + "s";
+            }, Math.random() * 1000);
+        }
+    </script>
+</body>
+</html>
